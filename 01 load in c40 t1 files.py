@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Nov 29 12:34:08 2022
+Created on Mon Jan  9 11:21:29 2023
 
 @author: gretam
 """
@@ -16,57 +16,116 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-from scipy import stats
-from pygam import LinearGAM, s, f
-from sklearn.linear_model import LinearRegression
 
 #%% user inputs - #%% is how you section off code blocks in spyder
 # data root folder path
 prj_folder = '/Users/gretam/Documents/'
-data_folder = '/Users/gretam/Documents/data/'
-c40t1_path = data_folder+'c40 target 1/'
-c40t2_path = data_folder+'c40 target 2/'
-
-# file path for easier referencing 
-ndvi_path=data_folder+'ndvi100/'
-ga_path=data_folder+'ga100/'
+data_folder = '/Users/gretam/Documents/data/c40 target 1/'
+ndvi_path=data_folder+'ndvi/'
+ga_path=data_folder+'ga/'
+mndvi_path=data_folder+'mndvi/'
+gba_path=data_folder+'gba/'
 
 # globals
 globals()['c40_list']= [os.path.splitext(i)[0] for i in os.listdir(ndvi_path)  if not i.startswith('.')]
 print(len(c40_list))
 
-#%% load data
+#%% load data and just do some basic checks that info is as we expect and that 
+# all the data sets for each city share the same shape, resolution, bounds, etc.ß
 
 # loop through geotiffs to print out some info
 for file in c40_list:
     ndvi=rxr.open_rasterio(ndvi_path+file+'.tif',masked=True).squeeze()
     ga=rxr.open_rasterio(ga_path+file+'.tif',masked=True).squeeze()
+    mndvi=rxr.open_rasterio(mndvi_path+file+'.tif',masked=True).squeeze()
+    gba=rxr.open_rasterio(gba_path+file+'.tif',masked=True).squeeze()
+    print(file)
     print("The crs of your data is:", ndvi.rio.crs)
     print("The nodatavalue of your data is:", ndvi.rio.nodata)
     print("The number of bands for your data is:", ndvi.rio.count)
     print("The shape of your data is:", ndvi.shape)
     print("The spatial resolution for your data is:", ndvi.rio.resolution())
     print(ndvi.rio.bounds())
+    #should all be same for ga
     print(ndvi.rio.crs==ga.rio.crs)
-    print(ndvi.rio.count==ga.rio.count)
     print(ndvi.rio.shape==ga.rio.shape)
     print(ndvi.rio.resolution()==ga.rio.resolution())
     print(ndvi.rio.bounds()==ga.rio.bounds())
+    #should all be same for mndvi
+    print(ndvi.rio.crs==mndvi.rio.crs)
+    print(ndvi.rio.shape==mndvi.rio.shape)
+    print(ndvi.rio.resolution()==mndvi.rio.resolution())
+    print(ndvi.rio.bounds()==mndvi.rio.bounds())
+    #should all be same for gba
+    print(ndvi.rio.crs==gba.rio.crs)
+    print(ndvi.rio.shape==gba.rio.shape)
+    print(ndvi.rio.resolution()==gba.rio.resolution())
+    print(ndvi.rio.bounds()==gba.rio.bounds())
+    #get name of of variable where data stored
     print("The metadata for your data is:", ndvi.attrs)
     print("The metadata for your data is:", ga.attrs)
+    print("The metadata for your data is:", mndvi.attrs)
+    print("The metadata for your data is:", gba.attrs)
 
-
-#%% merge ndvi and ga together
+#%% store info on city and corresponding ndvi, ga, mndvi, and gba in one dictionary 
 d = {}
 for city in c40_list:
+    #load in ndvi and then create df
     ndvi=rxr.open_rasterio(ndvi_path+city+'.tif',masked=True).squeeze()
-    ndvi_df=ndvi.to_dataset(name='ndvi_df')
+    ndvi_df=ndvi.to_dataset(name='ndvi')
+    #load in ga and then create df
     ga=rxr.open_rasterio(ga_path+city+'.tif',masked=True).squeeze()
-    ga_df=ga.to_dataset(name='ga_df')
-    merged=xr.combine_by_coords([ndvi_df, ga_df])
+    ga_df=ga.to_dataset(name='ga')
+    #load in mndvi and then create df
+    mndvi=rxr.open_rasterio(mndvi_path+city+'.tif',masked=True).squeeze()
+    mndvi_df=ndvi.to_dataset(name='mndvi')
+    #load in ga and then create df
+    gba=rxr.open_rasterio(gba_path+city+'.tif',masked=True).squeeze()
+    gba_df=gba.to_dataset(name='gba')
+    merged=xr.combine_by_coords([ndvi_df, ga_df, mndvi_df, gba_df])
     d[city]=merged
         
 print(d)
+
+#%% store summary info from this dictionary to an excel file
+c40_t1_summary = []
+for key, value in d.items():
+    #save city name 
+    city=key
+    #store ndvi summary stats
+    ndvi_mean=np.nanmean(value.ndvi)
+    ndvi_min=np.nanmean(value.ndvi)
+    ndvi_max=np.nanmean(value.ndvi)
+    ndvi_std=np.nanmean(value.ndvi)
+    ndvi_total=np.count_nonzero(np.isnan(value.ndvi))
+    #store ga summary stats
+    ga_mean=np.nanmean(value.ga)
+    ga_min=np.nanmean(value.ga)
+    ga_max=np.nanmean(value.ga)
+    ga_std=np.nanmean(value.ga)
+    ga_total=np.count_nonzero(np.isnan(value.ga))
+    #store mndvi summary stats
+    mndvi_mean=np.nanmean(value.mndvi)
+    mndvi_min=np.nanmean(value.mndvi)
+    mndvi_max=np.nanmean(value.mndvi)
+    mndvi_std=np.nanmean(value.mndvi)
+    mndvi_total=np.count_nonzero(np.isnan(value.mndvi))
+    #store gba summary stats
+    gba_mean=np.nanmean(value.gba)
+    gba_min=np.nanmean(value.gba)
+    gba_max=np.nanmean(value.gba)
+    gba_std=np.nanmean(value.gba)
+    gba_total=np.count_nonzero(np.isnan(value.gba))
+    #append all these variables together in a DF 
+    c40_t1_summary.append((city, ndvi_mean, ndvi_std, ndvi_min, ndvi_max, ndvi_total,
+                       ga_mean, ga_std, ga_min, ga_max, ga_total,    
+                       mndvi_mean, mndvi_std, mndvi_min, mndvi_max, mndvi_total,
+                       gba_mean, gba_std, gba_min, gba_max, gba_total)) 
+ 
+
+#cols=['City','min','max','mean', 'std', 'total pixels']
+c40_target1 = pd.DataFrame(c40_t1_summary)
+c40_target1.to_csv(prj_folder+'output/c40_target1_summary.csv')
 
 #%% extract Chicago data frame to plot
 Chicago=d['Chicago']
@@ -87,106 +146,8 @@ chicago_nomiss = chicago.dropna().reset_index()
 
 y=chicago_nomiss['ndvi_df']
 
-x=chicago_nomiss['ga_df']
-x=np.array(x).reshape((-1, 1))
-model = LinearRegression()
-model.fit(x, y)
-r_sq = model.score(x, y)
-print(r_sq)
 
 
-
-
-
-
-#%% reg for ndvi v. %ga
-gam = LinearGAM((x, y))
-print(gam)
-gam.plot
-gam = LinearGAM(s(0) + s(1) + f(2)).fit(x, y)
-
-
-print(x)
-slope, intercept, r, p, std_err = stats.linregress(x, y)
-
-
-def myfunc(x):
-  return slope * x + intercept
-
-mymodel = list(map(myfunc, x))
-
-plt.scatter(x, y)
-plt.plot(x, mymodel)
-plt.show()
-
-
-
-ns_1 = dict()
-
-    #loop through the c40 cities
-    for file in us_cities:
-        #open the water and ndvi files
-        city=rxr.open_rasterio(version+file+'.tif',masked=True).squeeze()
-        ns1 = city.stack(stacked=[...])
-        ns1 = ns1.values
-        ns_1[file] =ns1     
-
-    ns_1 = pd.DataFrame(ns_1.items(), columns = ['City', 'ns_1'])
-
-    ns_1 = ns_1.explode('ns_1')
-    ns_1['ns_1'] = ns_1['ns_1'].astype('float')
-
-
-
-
-
-#%% try to extract one of the city data frame to run regression on
-city_summary = []
-for file in c40_list:
-    city=rxr.open_rasterio(ndvi_path+file+'.tif',masked=True).squeeze()
-    print(city)
-    city_name=file
-    min=np.nanmin(city.data)
-    max=np.nanmax(city.data)
-    mean=np.nanmean(city.data)
-    std=np.nanstd(city.data)
-    total=np.size(city.data)
-    city_summary.append((city_name, 
-                 min, 
-                 max, 
-                 mean,
-                 std,
-                 total))
-
-
-cols=['City','min','max','mean', 'std', 'total pixels']
-ndvi_summary = pd.DataFrame(city_summary, columns=cols)
-
-#buffer file summary
-city_summary_buffer = []
-for file in c40_list:
-    city=rxr.open_rasterio(ndvi_path_buffer+file+'.tif',masked=True).squeeze()
-    print(city)
-    city_name=file
-    min=np.nanmin(city.data)
-    max=np.nanmax(city.data)
-    mean=np.nanmean(city.data)
-    std=np.nanstd(city.data)
-    total=np.size(city.data)
-    city_summary_buffer.append((city_name, 
-                 min, 
-                 max, 
-                 mean,
-                 std,
-                 total))
-    
-cols=['City','min','max','mean', 'std', 'total pixels']
-ndvi_summary_buffer = pd.DataFrame(city_summary_buffer, columns=cols)
-
-#merge the two together for a ndvi summary file
-ndvi_summary_merged=pd.merge(left=ndvi_summary, right=ndvi_summary_buffer, how='left', on='City', validate="1:1")
-ndvi_summary_merged.to_csv(prj_folder+'output/city_ndvi_summary.csv')
- 
 #%% plot city NDVI using matplotlib
 # smod plots
 for file in c40_list:
